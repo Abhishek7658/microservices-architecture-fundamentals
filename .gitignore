@@ -1,0 +1,5 @@
+
+# H2 runtime database files
+data/**/*.mv.db
+data/**/*.trace.db
+data/**/*.lock.db
