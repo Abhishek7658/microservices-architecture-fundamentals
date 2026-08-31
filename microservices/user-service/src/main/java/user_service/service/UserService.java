@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import user_service.exception.UserNotFoundException;
 import user_service.model.User;
 import user_service.repository.UserRepository;
 
@@ -23,6 +24,6 @@ public class UserService {
         return userRepository.findAll();
     }
     public User getUserById(Long id) {
-        return userRepository.findById(id).orElse(null);
+        return userRepository.findById(id).orElseThrow(()->new UserNotFoundException(id));
     }
 }

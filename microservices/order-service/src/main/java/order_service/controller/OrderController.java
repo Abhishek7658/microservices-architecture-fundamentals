@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import jakarta.validation.Valid;
 import order_service.model.Order;
 import order_service.repository.OrderRepository;
 import order_service.service.OrderService;
@@ -36,7 +37,12 @@ public class OrderController {
     }
 
     @PostMapping("/orders")
-    public Order createOrder(@RequestBody Order order) {
+    public Order createOrder(@Valid @RequestBody Order order) {
+
+        // Call User Service to verify/fetch the user
+        orderService.getUserById(order.getUserId());
+
+        // Save the order
         return orderRepository.save(order);
     }
 }
