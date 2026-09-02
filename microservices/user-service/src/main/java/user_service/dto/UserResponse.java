@@ -1,57 +1,36 @@
-package user_service.entity;
+package user_service.dto;
 
 import java.time.LocalDateTime;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
-import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+public class UserResponse {
 
-@Entity
-@Table(
-        name = "users",
-        uniqueConstraints = {
-                @UniqueConstraint(columnNames = "email")
-        }
-)
-public class User {
-
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private String name;
-
-    @Column(nullable = false)
     private String email;
-
     private String phone;
-
-    private String password;
-
     private String status;
-
     private LocalDateTime createdAt;
-
     private LocalDateTime updatedAt;
 
-    public User() {
+    public UserResponse() {
     }
 
-    @PrePersist
-    protected void onCreate() {
-        createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
+    public UserResponse(
+            Long id,
+            String name,
+            String email,
+            String phone,
+            String status,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt) {
 
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
+        this.id = id;
+        this.name = name;
+        this.email = email;
+        this.phone = phone;
+        this.status = status;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     public Long getId() {
@@ -84,14 +63,6 @@ public class User {
 
     public void setPhone(String phone) {
         this.phone = phone;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     public String getStatus() {

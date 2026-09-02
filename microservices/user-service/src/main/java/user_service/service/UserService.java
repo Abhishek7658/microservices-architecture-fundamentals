@@ -4,6 +4,9 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import user_service.dto.CreateUserRequest;
+import user_service.dto.UpdateUserRequest;
+import user_service.dto.UserResponse;
 import user_service.entity.User;
 import user_service.exception.UserNotFoundException;
 import user_service.repository.UserRepository;
@@ -17,32 +20,80 @@ public class UserService {
         this.userRepository = userRepository;
     }
 
-    public User createUser(User user) {
-        return userRepository.save(user);
-    }
-    public List<User> getUsers() {
-        return userRepository.findAll();
-    }
-    public User getUserById(Long id) {
-        return userRepository.findById(id).orElseThrow(()->new UserNotFoundException(id));
-    }
-    public User updateUser(Long id, User updatedUser) {
+    public UserResponse createUser(CreateUserRequest request) {
 
-    User existingUser = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException(id));
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException("Email already exists");
+        }
 
-    existingUser.setName(updatedUser.getName());
-    existingUser.setEmail(updatedUser.getEmail());
-    existingUser.setPhone(updatedUser.getPhone());
-    existingUser.setPassword(updatedUser.getPassword());
-    existingUser.setStatus(updatedUser.getStatus());
+        User user = new User();
 
-    return userRepository.save(existingUser);
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPhone(request.getPhone());
+        user.setPassword(request.getPassword());
+        user.setStatus(request.getStatus());
+
+        User savedUser = userRepository.save(user);
+
+        return mapToResponse(savedUser);
     }
+
+    public List<UserResponse> getUsers() {
+
+        return userRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public UserResponse getUserById(Long id) {
+
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        return mapToResponse(user);
+    }
+
+    public UserResponse updateUser(Long id, UpdateUserRequest request) {
+
+        User existingUser = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        if (!existingUser.getEmail().equals(request.getEmail())
+                && userRepository.existsByEmail(request.getEmail())) {
+
+            throw new IllegalArgumentException("Email already exists");
+        }
+
+        existingUser.setName(request.getName());
+        existingUser.setEmail(request.getEmail());
+        existingUser.setPhone(request.getPhone());
+        existingUser.setStatus(request.getStatus());
+
+        User updatedUser = userRepository.save(existingUser);
+
+        return mapToResponse(updatedUser);
+    }
+
     public void deleteUser(Long id) {
-    User user = userRepository.findById(id)
-            .orElseThrow(() -> new UserNotFoundException(id));
 
-    userRepository.delete(user);
-}
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new UserNotFoundException(id));
+
+        userRepository.delete(user);
+    }
+
+    private UserResponse mapToResponse(User user) {
+
+        return new UserResponse(
+                user.getId(),
+                user.getName(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getStatus(),
+                user.getCreatedAt(),
+                user.getUpdatedAt()
+        );
+    }
 }
