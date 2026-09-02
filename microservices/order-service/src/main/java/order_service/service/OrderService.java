@@ -33,4 +33,20 @@ public class OrderService {
         }
         //return restTemplate.getForObject(url, Object.class);
     }
+    public Order updateOrder(Long id, Order updatedOrder) {
+        Order existingOrder = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+
+        existingOrder.setUserId(updatedOrder.getUserId());
+        existingOrder.setProductId(updatedOrder.getProductId());
+        existingOrder.setQuantity(updatedOrder.getQuantity());
+
+        return orderRepository.save(existingOrder);
+    }
+    public void deleteOrder(Long id) {
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() -> new OrderNotFoundException(id));
+
+        orderRepository.delete(order);
+    }
 }
