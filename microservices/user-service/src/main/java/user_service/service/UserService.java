@@ -4,8 +4,8 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
+import user_service.entity.User;
 import user_service.exception.UserNotFoundException;
-import user_service.model.User;
 import user_service.repository.UserRepository;
 
 @Service

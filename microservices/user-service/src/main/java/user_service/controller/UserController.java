@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
-import user_service.model.User;
+import user_service.entity.User;
 import user_service.service.UserService;
 
 @RestController
