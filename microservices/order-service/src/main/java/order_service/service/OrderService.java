@@ -1,8 +1,13 @@
 package order_service.service;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
+import java.util.List;
+
+import org.springframework.stereotype.Service;
+
+import order_service.dto.CreateOrderRequest;
+import order_service.dto.OrderResponse;
+import order_service.dto.UpdateOrderRequest;
 import order_service.exception.OrderNotFoundException;
 import order_service.model.Order;
 import order_service.repository.OrderRepository;
@@ -10,43 +15,100 @@ import order_service.repository.OrderRepository;
 @Service
 public class OrderService {
 
-    private final RestTemplate restTemplate;
     private final OrderRepository orderRepository;
 
-    public OrderService(RestTemplate restTemplate, OrderRepository orderRepository) {
-        this.restTemplate = restTemplate;
+    public OrderService(OrderRepository orderRepository) {
         this.orderRepository = orderRepository;
     }
+    public List<OrderResponse> getAllOrders() {
 
-    public Order getOrderById(Long id) {
-        return orderRepository.findById(id).orElseThrow(() -> new OrderNotFoundException(id));
+        return orderRepository.findAll()
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+    public OrderResponse createOrder(CreateOrderRequest request) {
+
+        Order order = new Order();
+
+        order.setUserId(request.getUserId());
+        order.setProductName(request.getProductName());
+        order.setQuantity(request.getQuantity());
+        order.setAmount(request.getAmount());
+
+        order.setStatus("CREATED");
+
+        LocalDateTime now = LocalDateTime.now();
+        order.setCreatedAt(now);
+        order.setUpdatedAt(now);
+
+        Order savedOrder = orderRepository.save(order);
+
+        return mapToResponse(savedOrder);
     }
 
-    public Object getUserById(Long userId) {
-        String url = "http://localhost:8080/api/users/" + userId;
-        try {
-            return restTemplate.getForObject(url, Object.class);
-        } catch (RestClientException e) {
-            // Handle the exception (e.g., log it, throw a custom exception, etc.)
-            //System.err.println("Error fetching user data: " + e.getMessage());
-            throw new RuntimeException("User not found: " + userId);
-        }
-        //return restTemplate.getForObject(url, Object.class);
-    }
-    public Order updateOrder(Long id, Order updatedOrder) {
-        Order existingOrder = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
+    public OrderResponse getOrderById(Long id) {
 
-        existingOrder.setUserId(updatedOrder.getUserId());
-        existingOrder.setProductId(updatedOrder.getProductId());
-        existingOrder.setQuantity(updatedOrder.getQuantity());
-
-        return orderRepository.save(existingOrder);
-    }
-    public void deleteOrder(Long id) {
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
+                .orElseThrow(() ->
+                        new OrderNotFoundException(id)
+                );
 
-        orderRepository.delete(order);
+        return mapToResponse(order);
+    }
+
+    public List<OrderResponse> getOrdersByUserId(Long userId) {
+
+        return orderRepository.findByUserId(userId)
+                .stream()
+                .map(this::mapToResponse)
+                .toList();
+    }
+
+    public OrderResponse updateOrderStatus(
+            Long id,
+            UpdateOrderRequest request
+    ) {
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() ->
+                        new OrderNotFoundException(id)
+                );
+
+        order.setStatus(request.getStatus());
+        order.setUpdatedAt(LocalDateTime.now());
+
+        Order updatedOrder = orderRepository.save(order);
+
+        return mapToResponse(updatedOrder);
+    }
+
+    public void cancelOrder(Long id) {
+
+        Order order = orderRepository.findById(id)
+                .orElseThrow(() ->
+                        new OrderNotFoundException(id)
+                );
+
+        order.setStatus("CANCELLED");
+        order.setUpdatedAt(LocalDateTime.now());
+
+        orderRepository.save(order);
+    }
+
+    private OrderResponse mapToResponse(Order order) {
+
+        OrderResponse response = new OrderResponse();
+
+        response.setId(order.getId());
+        response.setUserId(order.getUserId());
+        response.setProductName(order.getProductName());
+        response.setQuantity(order.getQuantity());
+        response.setAmount(order.getAmount());
+        response.setStatus(order.getStatus());
+        response.setCreatedAt(order.getCreatedAt());
+        response.setUpdatedAt(order.getUpdatedAt());
+
+        return response;
     }
 }

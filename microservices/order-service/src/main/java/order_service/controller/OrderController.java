@@ -1,62 +1,70 @@
 package order_service.controller;
 
 import java.util.List;
+
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
-import order_service.model.Order;
-import order_service.repository.OrderRepository;
+import order_service.dto.CreateOrderRequest;
+import order_service.dto.OrderResponse;
+import order_service.dto.UpdateOrderRequest;
 import order_service.service.OrderService;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping("/api/v1/orders")
 public class OrderController {
 
-    private final OrderRepository orderRepository;
     private final OrderService orderService;
 
-    public OrderController(OrderRepository orderRepository, OrderService orderService) {
-        this.orderRepository = orderRepository;
+    public OrderController(OrderService orderService) {
         this.orderService = orderService;
     }
 
-    @GetMapping("/orders")
-    public List<Order> getOrders() {
-        return orderRepository.findAll();
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public OrderResponse createOrder(
+            @Valid @RequestBody CreateOrderRequest request) {
+
+        return orderService.createOrder(request);
     }
 
-    @GetMapping("/orders/{id}")
-    public Order getOrderById(@PathVariable Long id) {
+    @GetMapping
+    public List<OrderResponse> getAllOrders() {
+        return orderService.getAllOrders();
+    }
+
+    @GetMapping("/{id}")
+    public OrderResponse getOrderById(@PathVariable Long id) {
         return orderService.getOrderById(id);
     }
 
-    @PostMapping("/orders")
-    public Order createOrder(@Valid @RequestBody Order order) {
+    @GetMapping("/user/{userId}")
+    public List<OrderResponse> getOrdersByUserId(
+            @PathVariable Long userId) {
 
-        // Call User Service to verify/fetch the user
-        orderService.getUserById(order.getUserId());
-
-        // Save the order
-        return orderRepository.save(order);
+        return orderService.getOrdersByUserId(userId);
     }
 
-    @PutMapping("/orders/{id}")
-    public Order updateOrder(
-        @PathVariable Long id,
-        @Valid @RequestBody Order order) {
+    @PutMapping("/{id}/status")
+    public OrderResponse updateOrderStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateOrderRequest request) {
 
-        return orderService.updateOrder(id, order);
+        return orderService.updateOrderStatus(id, request);
     }
 
-    @DeleteMapping("/orders/{id}")
-    public void deleteOrder(@PathVariable Long id) {
-        orderService.deleteOrder(id);
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelOrder(@PathVariable Long id) {
+        orderService.cancelOrder(id);
     }
 }
