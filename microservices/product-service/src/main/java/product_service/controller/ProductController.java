@@ -132,4 +132,19 @@ public class ProductController {
 
         return ResponseEntity.noContent().build();
     }
+    // PUBLIC PRODUCT LISTING (no auth required)
+@GetMapping("/public")
+public ResponseEntity<?> getPublicProducts() {
+
+    return ResponseEntity.ok(
+            productService.getProducts(
+                    0,
+                    10,
+                    "id,asc",
+                    null,
+                    null,
+                    null
+            )
+    );
+}
 }
