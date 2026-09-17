@@ -1,5 +1,4 @@
 package product_service.controller;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -8,8 +7,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
+import product_service.dto.AuthResponse;
 import product_service.dto.LoginRequest;
-import product_service.dto.LoginResponse;
+import product_service.dto.RefreshRequest;
 import product_service.dto.RegisterRequest;
 import product_service.dto.RegisterResponse;
 import product_service.service.AuthService;
@@ -31,8 +31,13 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
     }
+    @PostMapping("/refresh")
+    public ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshRequest request) {
+    AuthResponse response = authService.refresh(request);
+    return ResponseEntity.ok(response);
+}
 }

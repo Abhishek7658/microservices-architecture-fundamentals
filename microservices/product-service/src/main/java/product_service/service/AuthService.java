@@ -5,25 +5,29 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import product_service.dto.AuthResponse;
 import product_service.dto.LoginRequest;
-import product_service.dto.LoginResponse;
+import product_service.dto.RefreshRequest;
 import product_service.dto.RegisterRequest;
 import product_service.dto.RegisterResponse;
 import product_service.model.User;
 import product_service.repository.UserRepository;
+import product_service.security.JwtService;
 
 @Service
 public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
 
-    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public AuthResponse login(LoginRequest request) {
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password"));
@@ -32,13 +36,11 @@ public class AuthService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
-        return new LoginResponse(
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getRole(),
-                "Login successful"
-        );
+        String accessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+        String refreshToken = jwtService.generateRefreshToken(user.getId(), user.getEmail());
+        long expiresInSeconds = jwtService.getAccessTokenExpirationMs() / 1000;
+
+        return new AuthResponse(accessToken, refreshToken, expiresInSeconds);
     }
 
     public RegisterResponse register(RegisterRequest request) {
@@ -63,4 +65,23 @@ public class AuthService {
                 saved.getCreatedAt()
         );
     }
+    public AuthResponse refresh(RefreshRequest request) {
+
+    String token = request.getRefreshToken();
+
+    if (!jwtService.isTokenValid(token)) {
+        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+    }
+
+    String email = jwtService.extractEmail(token);
+
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"));
+
+    String newAccessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+    String newRefreshToken = jwtService.generateRefreshToken(user.getId(), user.getEmail());
+    long expiresInSeconds = jwtService.getAccessTokenExpirationMs() / 1000;
+
+    return new AuthResponse(newAccessToken, newRefreshToken, expiresInSeconds);
+}
 }
