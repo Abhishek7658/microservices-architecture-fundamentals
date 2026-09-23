@@ -33,23 +33,68 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String authHeader = request.getHeader("Authorization");
 
+        System.out.println("===== JWT FILTER =====");
+        System.out.println("Request: " + request.getMethod() + " " + request.getRequestURI());
+        System.out.println("Authorization header present: " + (authHeader != null));
+
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            System.out.println("No valid Bearer header found");
             filterChain.doFilter(request, response);
             return;
         }
 
         String token = authHeader.substring(7);
 
-        if (jwtService.isTokenValid(token)) {
+        System.out.println("Bearer token received");
+        System.out.println("Token length: " + token.length());
+
+        boolean valid = jwtService.isTokenValid(token);
+
+        System.out.println("JWT valid: " + valid);
+
+        if (valid) {
+
             String email = jwtService.extractEmail(token);
             String role = jwtService.extractRole(token);
 
-            var authorities = List.of(new SimpleGrantedAuthority("ROLE_" + role));
-            var authentication = new UsernamePasswordAuthenticationToken(email, null, authorities);
+            System.out.println("JWT email: " + email);
+            System.out.println("JWT role: " + role);
 
-            SecurityContextHolder.getContext().setAuthentication(authentication);
+            var authorities =
+                    List.of(new SimpleGrantedAuthority("ROLE_" + role));
+
+            var authentication =
+                    new UsernamePasswordAuthenticationToken(
+                            email,
+                            null,
+                            authorities
+                    );
+
+            SecurityContextHolder.getContext()
+                    .setAuthentication(authentication);
+
+            System.out.println(
+                    "Authentication set: "
+                    + SecurityContextHolder.getContext()
+                            .getAuthentication()
+            );
         }
 
+        System.out.println(
+                "BEFORE FILTER CHAIN: "
+                + SecurityContextHolder.getContext().getAuthentication()
+        );
+
         filterChain.doFilter(request, response);
+
+        System.out.println(
+                "AFTER FILTER CHAIN - HTTP STATUS: "
+                + response.getStatus()
+        );
+
+        System.out.println(
+                "AFTER FILTER CHAIN AUTHENTICATION: "
+                + SecurityContextHolder.getContext().getAuthentication()
+        );
     }
 }

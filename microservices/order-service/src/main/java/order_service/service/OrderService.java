@@ -2,24 +2,35 @@ package order_service.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-
 import org.springframework.stereotype.Service;
 
+import order_service.client.UserServiceClient;
 import order_service.dto.CreateOrderRequest;
 import order_service.dto.OrderResponse;
 import order_service.dto.UpdateOrderRequest;
+import order_service.dto.UserResponse;
 import order_service.exception.OrderNotFoundException;
 import order_service.model.Order;
 import order_service.repository.OrderRepository;
+enum OrderStatus {
+    CREATED,
+    CANCELLED
+}
 
 @Service
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final UserServiceClient userServiceClient;
 
-    public OrderService(OrderRepository orderRepository) {
+    public OrderService(
+            OrderRepository orderRepository,
+            UserServiceClient userServiceClient) {
+
         this.orderRepository = orderRepository;
+        this.userServiceClient = userServiceClient;
     }
+
     public List<OrderResponse> getAllOrders() {
 
         return orderRepository.findAll()
@@ -27,16 +38,21 @@ public class OrderService {
                 .map(this::mapToResponse)
                 .toList();
     }
+
     public OrderResponse createOrder(CreateOrderRequest request) {
+
+        // Validate that the user exists in User Service
+        UserResponse user =
+                userServiceClient.getUserById(request.getUserId());
 
         Order order = new Order();
 
-        order.setUserId(request.getUserId());
+        order.setUserId(user.getId());
         order.setProductName(request.getProductName());
         order.setQuantity(request.getQuantity());
         order.setAmount(request.getAmount());
 
-        order.setStatus("CREATED");
+        order.setStatus(OrderStatus.CREATED.name());
 
         LocalDateTime now = LocalDateTime.now();
         order.setCreatedAt(now);
@@ -90,7 +106,7 @@ public class OrderService {
                         new OrderNotFoundException(id)
                 );
 
-        order.setStatus("CANCELLED");
+        order.setStatus(OrderStatus.CANCELLED.name());
         order.setUpdatedAt(LocalDateTime.now());
 
         orderRepository.save(order);

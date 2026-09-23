@@ -2,6 +2,7 @@ package product_service.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -49,6 +50,20 @@ public class SecurityConfig {
                     "/swagger-ui.html",
                     "/api/v1/auth/**"
                 ).permitAll()
+
+                .requestMatchers(HttpMethod.DELETE, "/api/v1/products/**", "/api/v2/products/**", "/products/**")
+                    .hasRole("ADMIN")
+
+                .requestMatchers(HttpMethod.POST, "/api/v1/products/**", "/api/v2/products/**", "/products/**")
+                    .hasAnyRole("ADMIN", "MANAGER")
+                .requestMatchers(HttpMethod.PUT, "/api/v1/products/**", "/api/v2/products/**", "/products/**")
+                    .hasAnyRole("ADMIN", "MANAGER")
+                .requestMatchers(HttpMethod.PATCH, "/api/v1/products/**", "/api/v2/products/**", "/products/**")
+                    .hasAnyRole("ADMIN", "MANAGER")
+
+                .requestMatchers(HttpMethod.GET, "/api/v1/products/**", "/api/v2/products/**", "/products/**")
+                    .authenticated()
+
                 .anyRequest().authenticated()
             )
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
@@ -56,3 +71,4 @@ public class SecurityConfig {
         return http.build();
     }
 }
+

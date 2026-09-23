@@ -53,6 +53,8 @@ public class AuthService {
         user.setName(request.getName());
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
+        // role is intentionally NOT set here — User.java already defaults it to "USER".
+        // Never let a client choose their own role at registration.
 
         User saved = userRepository.save(user);
 
@@ -65,23 +67,24 @@ public class AuthService {
                 saved.getCreatedAt()
         );
     }
+
     public AuthResponse refresh(RefreshRequest request) {
 
-    String token = request.getRefreshToken();
+        String token = request.getRefreshToken();
 
-    if (!jwtService.isTokenValid(token)) {
-        throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        if (!jwtService.isTokenValid(token)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token");
+        }
+
+        String email = jwtService.extractEmail(token);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"));
+
+        String newAccessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
+        String newRefreshToken = jwtService.generateRefreshToken(user.getId(), user.getEmail());
+        long expiresInSeconds = jwtService.getAccessTokenExpirationMs() / 1000;
+
+        return new AuthResponse(newAccessToken, newRefreshToken, expiresInSeconds);
     }
-
-    String email = jwtService.extractEmail(token);
-
-    User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid or expired refresh token"));
-
-    String newAccessToken = jwtService.generateAccessToken(user.getId(), user.getEmail(), user.getRole());
-    String newRefreshToken = jwtService.generateRefreshToken(user.getId(), user.getEmail());
-    long expiresInSeconds = jwtService.getAccessTokenExpirationMs() / 1000;
-
-    return new AuthResponse(newAccessToken, newRefreshToken, expiresInSeconds);
-}
 }

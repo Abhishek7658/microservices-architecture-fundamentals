@@ -84,6 +84,13 @@ public class ProductService {
                     (String) updates.get("category")
             );
         }
+        if (updates.containsKey("stock")) {
+        existingProduct.setStock(
+                Integer.valueOf(
+                        updates.get("stock").toString()
+                )
+        );
+    }
 
         return productRepository.save(existingProduct);
     }

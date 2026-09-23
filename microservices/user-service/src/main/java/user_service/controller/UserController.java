@@ -50,6 +50,20 @@ public class UserController {
     public ResponseEntity<UserResponse> getUserById(
             @PathVariable Long id) {
 
+
+
+//for testing code
+
+    //             try {
+    //     Thread.sleep(5000); // TEMPORARY — for timeout testing only
+    // } catch (InterruptedException e) {
+    //     Thread.currentThread().interrupt();
+    // }
+
+//end of testing code
+
+
+
         return ResponseEntity.ok(
                 userService.getUserById(id)
         );
