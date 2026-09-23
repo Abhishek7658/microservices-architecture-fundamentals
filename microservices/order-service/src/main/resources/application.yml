@@ -3,15 +3,10 @@ spring:
     name: order-service
 
   profiles:
-    active: prod
+    active: dev
 
   jpa:
     hibernate:
       ddl-auto: update
     show-sql: true
-resilience:
-  user-service:
-    connect-timeout-ms: 2000
-    read-timeout-ms: 2000
-    max-retry-attempts: 3
-    initial-backoff-ms: 500
+
