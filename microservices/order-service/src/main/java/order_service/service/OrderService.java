@@ -1,64 +1,101 @@
 package order_service.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import order_service.client.UserServiceClient;
 import order_service.dto.CreateOrderRequest;
 import order_service.dto.OrderResponse;
 import order_service.dto.UpdateOrderRequest;
 import order_service.dto.UserResponse;
+import order_service.event.OrderCreatedEvent;
+import order_service.event.OrderEventPublisher;
 import order_service.exception.OrderNotFoundException;
 import order_service.model.Order;
+import order_service.model.OrderItem;
+import order_service.repository.OrderItemRepository;
 import order_service.repository.OrderRepository;
+
 enum OrderStatus {
-    CREATED,
-    CANCELLED
+    CREATED, CANCELLED
 }
 
 @Service
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderItemRepository orderItemRepository;
     private final UserServiceClient userServiceClient;
+    private final OrderEventPublisher orderEventPublisher;
 
     public OrderService(
             OrderRepository orderRepository,
-            UserServiceClient userServiceClient) {
+            OrderItemRepository orderItemRepository,
+            UserServiceClient userServiceClient,
+            OrderEventPublisher orderEventPublisher) {
 
         this.orderRepository = orderRepository;
+        this.orderItemRepository = orderItemRepository;
         this.userServiceClient = userServiceClient;
+        this.orderEventPublisher = orderEventPublisher;
     }
 
     public List<OrderResponse> getAllOrders() {
-
         return orderRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
                 .toList();
     }
 
+    @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
 
-        // Validate that the user exists in User Service
-        UserResponse user =
-                userServiceClient.getUserById(request.getUserId());
+        // Get user from User Service
+        UserResponse user = userServiceClient.getUserById(request.getUserId());
 
+        // Create Order
         Order order = new Order();
 
         order.setUserId(user.getId());
         order.setProductName(request.getProductName());
         order.setQuantity(request.getQuantity());
         order.setAmount(request.getAmount());
-
         order.setStatus(OrderStatus.CREATED.name());
 
         LocalDateTime now = LocalDateTime.now();
+
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
 
+        // Save Order
         Order savedOrder = orderRepository.save(order);
+
+        // Create Order Item
+        OrderItem orderItem = new OrderItem();
+
+        orderItem.setOrder(savedOrder);
+        orderItem.setProductName(savedOrder.getProductName());
+        orderItem.setQuantity(savedOrder.getQuantity());
+        orderItem.setAmount(savedOrder.getAmount());
+
+        // Save Order Item
+        orderItemRepository.save(orderItem);
+
+        // Create Kafka event
+        OrderCreatedEvent event = new OrderCreatedEvent(
+                savedOrder.getId(),
+                savedOrder.getUserId(),
+                BigDecimal.valueOf(savedOrder.getAmount()),
+                "ORDER_CREATED",
+                savedOrder.getCreatedAt()
+        );
+
+        // Publish Kafka event
+        orderEventPublisher.publishOrderCreated(event);
 
         return mapToResponse(savedOrder);
     }
@@ -66,9 +103,7 @@ public class OrderService {
     public OrderResponse getOrderById(Long id) {
 
         Order order = orderRepository.findById(id)
-                .orElseThrow(() ->
-                        new OrderNotFoundException(id)
-                );
+                .orElseThrow(() -> new OrderNotFoundException(id));
 
         return mapToResponse(order);
     }
@@ -83,13 +118,10 @@ public class OrderService {
 
     public OrderResponse updateOrderStatus(
             Long id,
-            UpdateOrderRequest request
-    ) {
+            UpdateOrderRequest request) {
 
         Order order = orderRepository.findById(id)
-                .orElseThrow(() ->
-                        new OrderNotFoundException(id)
-                );
+                .orElseThrow(() -> new OrderNotFoundException(id));
 
         order.setStatus(request.getStatus());
         order.setUpdatedAt(LocalDateTime.now());
@@ -102,9 +134,7 @@ public class OrderService {
     public void cancelOrder(Long id) {
 
         Order order = orderRepository.findById(id)
-                .orElseThrow(() ->
-                        new OrderNotFoundException(id)
-                );
+                .orElseThrow(() -> new OrderNotFoundException(id));
 
         order.setStatus(OrderStatus.CANCELLED.name());
         order.setUpdatedAt(LocalDateTime.now());

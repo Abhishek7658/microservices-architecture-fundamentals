@@ -35,15 +35,18 @@ public class PaymentService {
 
     // Update payment
     public Payment updatePayment(Long id, Payment updatedPayment) {
-        Payment existingPayment = paymentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+    Payment existingPayment = paymentRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Payment not found"));
 
-        existingPayment.setOrderId(updatedPayment.getOrderId());
-        existingPayment.setAmount(updatedPayment.getAmount());
-        existingPayment.setStatus(updatedPayment.getStatus());
+    existingPayment.setOrderId(updatedPayment.getOrderId());
+    existingPayment.setAmount(updatedPayment.getAmount());
+    existingPayment.setStatus(updatedPayment.getStatus());
+    existingPayment.setTransactionReference(
+            updatedPayment.getTransactionReference()
+    );
 
-        return paymentRepository.save(existingPayment);
-    }
+    return paymentRepository.save(existingPayment);
+}
 
     // Delete payment
     public void deletePayment(Long id) {
