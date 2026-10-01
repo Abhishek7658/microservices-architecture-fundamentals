@@ -54,13 +54,13 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(CreateOrderRequest request) {
 
-        // Get user from User Service
-        UserResponse user = userServiceClient.getUserById(request.getUserId());
+        UserResponse user =
+                userServiceClient.getUserById(request.getUserId());
 
-        // Create Order
         Order order = new Order();
 
         order.setUserId(user.getId());
+        order.setProductId(request.getProductId());
         order.setProductName(request.getProductName());
         order.setQuantity(request.getQuantity());
         order.setAmount(request.getAmount());
@@ -71,30 +71,29 @@ public class OrderService {
         order.setCreatedAt(now);
         order.setUpdatedAt(now);
 
-        // Save Order
         Order savedOrder = orderRepository.save(order);
 
-        // Create Order Item
         OrderItem orderItem = new OrderItem();
 
         orderItem.setOrder(savedOrder);
+        orderItem.setProductId(savedOrder.getProductId());
         orderItem.setProductName(savedOrder.getProductName());
         orderItem.setQuantity(savedOrder.getQuantity());
         orderItem.setAmount(savedOrder.getAmount());
 
-        // Save Order Item
         orderItemRepository.save(orderItem);
 
-        // Create Kafka event
         OrderCreatedEvent event = new OrderCreatedEvent(
                 savedOrder.getId(),
                 savedOrder.getUserId(),
+                savedOrder.getProductId(),
+                savedOrder.getProductName(),
+                savedOrder.getQuantity(),
                 BigDecimal.valueOf(savedOrder.getAmount()),
                 "ORDER_CREATED",
                 savedOrder.getCreatedAt()
         );
 
-        // Publish Kafka event
         orderEventPublisher.publishOrderCreated(event);
 
         return mapToResponse(savedOrder);

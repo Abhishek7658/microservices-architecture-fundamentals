@@ -22,6 +22,9 @@ public class Order {
     private Long userId;
 
     @NotNull
+    private Long productId;
+
+    @NotNull
     private String productName;
 
     @NotNull
@@ -39,9 +42,18 @@ public class Order {
     public Order() {
     }
 
-    public Order(Long userId, String productName, Integer quantity,
-                 Double amount, String status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public Order(
+            Long userId,
+            Long productId,
+            String productName,
+            Integer quantity,
+            Double amount,
+            String status,
+            LocalDateTime createdAt,
+            LocalDateTime updatedAt) {
+
         this.userId = userId;
+        this.productId = productId;
         this.productName = productName;
         this.quantity = quantity;
         this.amount = amount;
@@ -56,6 +68,10 @@ public class Order {
 
     public Long getUserId() {
         return userId;
+    }
+
+    public Long getProductId() {
+        return productId;
     }
 
     public String getProductName() {
@@ -78,8 +94,16 @@ public class Order {
         return createdAt;
     }
 
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
     }
 
     public void setProductName(String productName) {
@@ -102,12 +126,7 @@ public class Order {
         this.createdAt = createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
-
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
     }
-
 }

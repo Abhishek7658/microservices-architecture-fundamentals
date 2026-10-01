@@ -9,6 +9,9 @@ public class CreateOrderRequest {
     private Long userId;
 
     @NotNull
+    private Long productId;
+
+    @NotNull
     private String productName;
 
     @NotNull
@@ -26,6 +29,10 @@ public class CreateOrderRequest {
         return userId;
     }
 
+    public Long getProductId() {
+        return productId;
+    }
+
     public String getProductName() {
         return productName;
     }
@@ -40,6 +47,10 @@ public class CreateOrderRequest {
 
     public void setUserId(Long userId) {
         this.userId = userId;
+    }
+
+    public void setProductId(Long productId) {
+        this.productId = productId;
     }
 
     public void setProductName(String productName) {
