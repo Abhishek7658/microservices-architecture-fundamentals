@@ -1,15 +1,17 @@
 package com.blackroth.inventory_service.event;
 
-import com.blackroth.inventory_service.service.InventoryService;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+
+import com.blackroth.inventory_service.service.InventoryService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Component
 public class InventoryKafkaListener {
 
     private final InventoryService inventoryService;
     private final InventoryEventPublisher inventoryEventPublisher;
+
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public InventoryKafkaListener(
@@ -27,16 +29,18 @@ public class InventoryKafkaListener {
     public void handleOrderCreated(String message) {
 
         try {
+
             OrderCreatedEvent event =
                     objectMapper.readValue(
                             message,
                             OrderCreatedEvent.class
                     );
 
-            boolean reserved = inventoryService.reserveInventory(
-                    event.getProductId(),
-                    event.getQuantity()
-            );
+            boolean reserved =
+                    inventoryService.reserveInventory(
+                            event.getProductId(),
+                            event.getQuantity()
+                    );
 
             if (reserved) {
 
@@ -53,6 +57,19 @@ public class InventoryKafkaListener {
                 );
 
             } else {
+
+                InventoryReservationFailedEvent failedEvent =
+                        new InventoryReservationFailedEvent(
+                                event.getOrderId(),
+                                event.getProductId(),
+                                event.getQuantity(),
+                                "Insufficient inventory"
+                        );
+
+                inventoryEventPublisher
+                        .publishInventoryReservationFailed(
+                                failedEvent
+                        );
 
                 System.out.println(
                         "Inventory unavailable for order: "

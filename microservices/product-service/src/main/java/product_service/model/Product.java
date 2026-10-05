@@ -1,4 +1,6 @@
 package product_service.model;
+
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.Entity;
@@ -12,28 +14,43 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
+
 @Entity
 @Table(name = "products")
-public class Product {
+public class Product implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @NotBlank(message = "Product name is required")
-    @Size(min=3, max=100, message="Product name must be between 3 and 100 characters")
+    @Size(
+            min = 3,
+            max = 100,
+            message = "Product name must be between 3 and 100 characters"
+    )
     private String name;
+
     @NotNull(message = "Price is required")
     @Positive(message = "Price must be a positive value")
     private Double price;
+
     @NotBlank(message = "Category is required")
-    @Size(min=2, max=50, message="Category must be between 2 and 50 characters")
+    @Size(
+            min = 2,
+            max = 50,
+            message = "Category must be between 2 and 50 characters"
+    )
     private String category;
 
     private LocalDateTime createdAt;
-    @PositiveOrZero(message = "Stock cannot be negative")
-    private Integer stock=0;
-    private String status;
 
+    @PositiveOrZero(message = "Stock cannot be negative")
+    private Integer stock = 0;
+
+    private String status;
 
     @PrePersist
     public void prePersist() {
@@ -43,7 +60,15 @@ public class Product {
     public Product() {
     }
 
-    public Product(Long id, String name, Double price, String category, LocalDateTime createdAt, Integer stock, String status) {
+    public Product(
+            Long id,
+            String name,
+            Double price,
+            String category,
+            LocalDateTime createdAt,
+            Integer stock,
+            String status) {
+
         this.id = id;
         this.name = name;
         this.price = price;
@@ -92,17 +117,20 @@ public class Product {
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
+
     public Integer getStock() {
         return stock;
     }
+
     public void setStock(Integer stock) {
         this.stock = stock;
     }
+
     public String getStatus() {
         return status;
     }
+
     public void setStatus(String status) {
         this.status = status;
     }
-    
 }

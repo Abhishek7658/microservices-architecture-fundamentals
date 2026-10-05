@@ -1,25 +1,22 @@
-package payment_service.event;
+package order_service.event;
 
-public class PaymentFailedEvent {
+public class InventoryReleasedEvent {
 
     private Long orderId;
     private Long productId;
     private Integer quantity;
-    private String reason;
 
-    public PaymentFailedEvent() {
+    public InventoryReleasedEvent() {
     }
 
-    public PaymentFailedEvent(
+    public InventoryReleasedEvent(
             Long orderId,
             Long productId,
-            Integer quantity,
-            String reason) {
+            Integer quantity) {
 
         this.orderId = orderId;
         this.productId = productId;
         this.quantity = quantity;
-        this.reason = reason;
     }
 
     public Long getOrderId() {
@@ -44,13 +41,5 @@ public class PaymentFailedEvent {
 
     public void setQuantity(Integer quantity) {
         this.quantity = quantity;
-    }
-
-    public String getReason() {
-        return reason;
-    }
-
-    public void setReason(String reason) {
-        this.reason = reason;
     }
 }

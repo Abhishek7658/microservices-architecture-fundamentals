@@ -1,4 +1,4 @@
-package payment_service.event;
+package com.blackroth.inventory_service.event;
 
 public class PaymentFailedEvent {
 

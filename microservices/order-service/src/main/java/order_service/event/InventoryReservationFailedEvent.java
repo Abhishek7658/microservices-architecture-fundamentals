@@ -1,16 +1,16 @@
-package payment_service.event;
+package order_service.event;
 
-public class PaymentFailedEvent {
+public class InventoryReservationFailedEvent {
 
     private Long orderId;
     private Long productId;
     private Integer quantity;
     private String reason;
 
-    public PaymentFailedEvent() {
+    public InventoryReservationFailedEvent() {
     }
 
-    public PaymentFailedEvent(
+    public InventoryReservationFailedEvent(
             Long orderId,
             Long productId,
             Integer quantity,

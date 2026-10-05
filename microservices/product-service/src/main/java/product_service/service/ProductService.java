@@ -7,6 +7,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -35,8 +37,15 @@ public class ProductService {
         return productRepository.save(product);
     }
 
-    // GET BY ID
+    // GET BY ID - Redis cache
+    @Cacheable(
+            cacheNames = "products",
+            key = "#id"
+    )
     public Product getProductById(Long id) {
+
+        System.out.println("Cache MISS - loading product from database: " + id);
+
         return productRepository.findById(id)
                 .orElseThrow(() ->
                         new RuntimeException(
@@ -45,7 +54,11 @@ public class ProductService {
                 );
     }
 
-    // UPDATE
+    // UPDATE - invalidate Redis cache
+    @CacheEvict(
+            cacheNames = "products",
+            key = "#id"
+    )
     public Product updateProduct(Long id, Product updatedProduct) {
 
         Product existingProduct = getProductById(id);
@@ -57,7 +70,11 @@ public class ProductService {
         return productRepository.save(existingProduct);
     }
 
-    // PATCH
+    // PATCH - invalidate Redis cache
+    @CacheEvict(
+            cacheNames = "products",
+            key = "#id"
+    )
     public Product patchProduct(
             Long id,
             Map<String, Object> updates
@@ -84,18 +101,15 @@ public class ProductService {
                     (String) updates.get("category")
             );
         }
-        if (updates.containsKey("stock")) {
-        existingProduct.setStock(
-                Integer.valueOf(
-                        updates.get("stock").toString()
-                )
-        );
-    }
 
         return productRepository.save(existingProduct);
     }
 
-    // DELETE
+    // DELETE - invalidate Redis cache
+    @CacheEvict(
+            cacheNames = "products",
+            key = "#id"
+    )
     public void deleteProduct(Long id) {
 
         Product product = getProductById(id);
@@ -105,8 +119,12 @@ public class ProductService {
 
     // Helper to convert Product entity -> V2 response shape
     private ProductV2Response toV2Response(Product product) {
-        String status = (product.getStock() != null && product.getStock() > 0)
-                ? "AVAILABLE" : "OUT_OF_STOCK";
+
+        String status =
+                (product.getStock() != null && product.getStock() > 0)
+                        ? "AVAILABLE"
+                        : "OUT_OF_STOCK";
+
         return new ProductV2Response(
                 product.getId(),
                 product.getName(),
@@ -119,57 +137,98 @@ public class ProductService {
 
     // GET single product (v2)
     public ProductV2Response getProductV2ById(Long id) {
+
         Product product = getProductById(id);
+
         return toV2Response(product);
     }
 
     // POST - create (v2)
-    public ProductV2Response createProductV2(ProductV2Request request) {
+    public ProductV2Response createProductV2(
+            ProductV2Request request) {
+
         Product product = new Product();
+
         product.setName(request.getName());
         product.setPrice(request.getPrice());
         product.setCategory(request.getCategory());
-        product.setStock(Optional.ofNullable(request.getStock()).orElse(0));
+        product.setStock(
+                Optional.ofNullable(request.getStock()).orElse(0)
+        );
 
         Product saved = productRepository.save(product);
+
         return toV2Response(saved);
     }
 
     // PUT - full update (v2)
-    public ProductV2Response updateProductV2(Long id, ProductV2Request request) {
+    @CacheEvict(
+            cacheNames = "products",
+            key = "#id"
+    )
+    public ProductV2Response updateProductV2(
+            Long id,
+            ProductV2Request request) {
+
         Product existing = getProductById(id);
+
         existing.setName(request.getName());
         existing.setPrice(request.getPrice());
         existing.setCategory(request.getCategory());
-        existing.setStock(Optional.ofNullable(request.getStock()).orElse(0));
+        existing.setStock(
+                Optional.ofNullable(request.getStock()).orElse(0)
+        );
 
         Product updated = productRepository.save(existing);
+
         return toV2Response(updated);
     }
 
     // PATCH - partial update (v2)
-    public ProductV2Response patchProductV2(Long id, Map<String, Object> updates) {
+    @CacheEvict(
+            cacheNames = "products",
+            key = "#id"
+    )
+    public ProductV2Response patchProductV2(
+            Long id,
+            Map<String, Object> updates) {
+
         Product existing = getProductById(id);
 
         if (updates.containsKey("name")) {
-            existing.setName((String) updates.get("name"));
+            existing.setName(
+                    (String) updates.get("name")
+            );
         }
+
         if (updates.containsKey("price")) {
-            existing.setPrice(Double.valueOf(updates.get("price").toString()));
+            existing.setPrice(
+                    Double.valueOf(
+                            updates.get("price").toString()
+                    )
+            );
         }
+
         if (updates.containsKey("category")) {
-            existing.setCategory((String) updates.get("category"));
+            existing.setCategory(
+                    (String) updates.get("category")
+            );
         }
+
         if (updates.containsKey("stock")) {
-            existing.setStock(Integer.valueOf(updates.get("stock").toString()));
+            existing.setStock(
+                    Integer.valueOf(
+                            updates.get("stock").toString()
+                    )
+            );
         }
 
         Product saved = productRepository.save(existing);
+
         return toV2Response(saved);
     }
 
-    // Shared helper: builds a validated Page<Product> from pagination/sort/filter params.
-    // Used by both v1 getProducts() and v2 getProductsV2() so their behavior never drifts apart.
+    // Shared helper: builds a validated Page<Product>
     private Page<Product> fetchProductPage(
             int page,
             int size,
@@ -179,21 +238,18 @@ public class ProductService {
             Double maxPrice
     ) {
 
-        // PAGE VALIDATION
         if (page < 0) {
             throw new IllegalArgumentException(
                     "Page number cannot be negative"
             );
         }
 
-        // SIZE VALIDATION
         if (size <= 0) {
             throw new IllegalArgumentException(
                     "Page size must be greater than zero"
             );
         }
 
-        // PRICE RANGE VALIDATION
         if (minPrice != null
                 && maxPrice != null
                 && minPrice > maxPrice) {
@@ -203,7 +259,6 @@ public class ProductService {
             );
         }
 
-        // SORT VALIDATION
         String[] sortParams = sort.split(",");
 
         String sortField = sortParams[0];
@@ -238,7 +293,6 @@ public class ProductService {
 
         Page<Product> productPage;
 
-        // CATEGORY + PRICE RANGE
         if (category != null
                 && minPrice != null
                 && maxPrice != null) {
@@ -251,7 +305,6 @@ public class ProductService {
                             pageable
                     );
 
-        // ONLY CATEGORY
         } else if (category != null) {
 
             productPage =
@@ -260,7 +313,6 @@ public class ProductService {
                             pageable
                     );
 
-        // ONLY PRICE RANGE
         } else if (minPrice != null
                 && maxPrice != null) {
 
@@ -271,7 +323,6 @@ public class ProductService {
                             pageable
                     );
 
-        // NO FILTER
         } else {
 
             productPage =
@@ -292,7 +343,14 @@ public class ProductService {
     ) {
 
         Page<Product> productPage =
-                fetchProductPage(page, size, sort, category, minPrice, maxPrice);
+                fetchProductPage(
+                        page,
+                        size,
+                        sort,
+                        category,
+                        minPrice,
+                        maxPrice
+                );
 
         Map<String, Object> response =
                 new HashMap<>();
@@ -336,14 +394,22 @@ public class ProductService {
     ) {
 
         Page<Product> productPage =
-                fetchProductPage(page, size, sort, category, minPrice, maxPrice);
+                fetchProductPage(
+                        page,
+                        size,
+                        sort,
+                        category,
+                        minPrice,
+                        maxPrice
+                );
 
         Map<String, Object> response =
                 new HashMap<>();
 
         response.put(
                 "content",
-                productPage.getContent().stream()
+                productPage.getContent()
+                        .stream()
                         .map(this::toV2Response)
                         .collect(Collectors.toList())
         );
@@ -370,5 +436,4 @@ public class ProductService {
 
         return response;
     }
-
 }

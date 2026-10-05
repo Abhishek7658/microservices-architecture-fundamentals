@@ -12,6 +12,9 @@ public class InventoryEventPublisher {
     private static final String INVENTORY_RELEASED_TOPIC =
             "inventory-released";
 
+    private static final String INVENTORY_RESERVATION_FAILED_TOPIC =
+            "inventory-reservation-failed";
+
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public InventoryEventPublisher(
@@ -35,6 +38,16 @@ public class InventoryEventPublisher {
 
         kafkaTemplate.send(
                 INVENTORY_RELEASED_TOPIC,
+                event.getOrderId().toString(),
+                event
+        );
+    }
+
+    public void publishInventoryReservationFailed(
+            InventoryReservationFailedEvent event) {
+
+        kafkaTemplate.send(
+                INVENTORY_RESERVATION_FAILED_TOPIC,
                 event.getOrderId().toString(),
                 event
         );

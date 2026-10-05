@@ -42,12 +42,15 @@ public class PaymentService {
         // Payment failure condition
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
 
-            paymentEventPublisher.publishPaymentFailed(
+            PaymentFailedEvent failedEvent =
                     new PaymentFailedEvent(
                             event.getOrderId(),
+                            event.getProductId(),
+                            event.getQuantity(),
                             "Payment failed: invalid payment amount"
-                    )
-            );
+                    );
+
+            paymentEventPublisher.publishPaymentFailed(failedEvent);
 
             return;
         }
