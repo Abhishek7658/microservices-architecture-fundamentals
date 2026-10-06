@@ -1,11 +1,16 @@
 package order_service.service;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 import order_service.client.UserServiceClient;
 import order_service.dto.CreateOrderRequest;
@@ -31,17 +36,26 @@ public class OrderService {
     private final OrderItemRepository orderItemRepository;
     private final UserServiceClient userServiceClient;
     private final OrderEventPublisher orderEventPublisher;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
+
+    private static final String IDEMPOTENCY_PREFIX = "idempotency:order:";
+    private static final Duration IDEMPOTENCY_TTL = Duration.ofHours(24);
 
     public OrderService(
             OrderRepository orderRepository,
             OrderItemRepository orderItemRepository,
             UserServiceClient userServiceClient,
-            OrderEventPublisher orderEventPublisher) {
+            OrderEventPublisher orderEventPublisher,
+            StringRedisTemplate redisTemplate,
+            ObjectMapper objectMapper) {
 
         this.orderRepository = orderRepository;
         this.orderItemRepository = orderItemRepository;
         this.userServiceClient = userServiceClient;
         this.orderEventPublisher = orderEventPublisher;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public List<OrderResponse> getAllOrders() {
@@ -52,57 +66,142 @@ public class OrderService {
     }
 
     @Transactional
-    public OrderResponse createOrder(CreateOrderRequest request) {
+    public OrderResponse createOrder(
+            String idempotencyKey,
+            CreateOrderRequest request) {
 
-        UserResponse user =
-                userServiceClient.getUserById(request.getUserId());
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Idempotency-Key header is required");
+        }
 
-        Order order = new Order();
+        String redisKey = IDEMPOTENCY_PREFIX + idempotencyKey;
 
-        order.setUserId(user.getId());
-        order.setProductId(request.getProductId());
-        order.setProductName(request.getProductName());
-        order.setQuantity(request.getQuantity());
-        order.setAmount(request.getAmount());
-        order.setStatus(OrderStatus.CREATED.name());
+        String existingResponse =
+                redisTemplate.opsForValue().get(redisKey);
 
-        LocalDateTime now = LocalDateTime.now();
+        if (existingResponse != null) {
 
-        order.setCreatedAt(now);
-        order.setUpdatedAt(now);
+            if ("PROCESSING".equals(existingResponse)) {
+                throw new IllegalStateException(
+                        "Request with this Idempotency-Key is already being processed");
+            }
 
-        Order savedOrder = orderRepository.save(order);
+            try {
+                return objectMapper.readValue(
+                        existingResponse,
+                        OrderResponse.class);
 
-        OrderItem orderItem = new OrderItem();
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException(
+                        "Unable to read stored idempotent response",
+                        e);
+            }
+        }
 
-        orderItem.setOrder(savedOrder);
-        orderItem.setProductId(savedOrder.getProductId());
-        orderItem.setProductName(savedOrder.getProductName());
-        orderItem.setQuantity(savedOrder.getQuantity());
-        orderItem.setAmount(savedOrder.getAmount());
+        Boolean keyCreated = redisTemplate.opsForValue()
+                .setIfAbsent(
+                        redisKey,
+                        "PROCESSING",
+                        IDEMPOTENCY_TTL);
 
-        orderItemRepository.save(orderItem);
+        if (!Boolean.TRUE.equals(keyCreated)) {
 
-        OrderCreatedEvent event = new OrderCreatedEvent(
-                savedOrder.getId(),
-                savedOrder.getUserId(),
-                savedOrder.getProductId(),
-                savedOrder.getProductName(),
-                savedOrder.getQuantity(),
-                BigDecimal.valueOf(savedOrder.getAmount()),
-                "ORDER_CREATED",
-                savedOrder.getCreatedAt()
-        );
+            String storedResponse =
+                    redisTemplate.opsForValue().get(redisKey);
 
-        orderEventPublisher.publishOrderCreated(event);
+            if ("PROCESSING".equals(storedResponse)) {
+                throw new IllegalStateException(
+                        "Request with this Idempotency-Key is already being processed");
+            }
 
-        return mapToResponse(savedOrder);
+            try {
+                return objectMapper.readValue(
+                        storedResponse,
+                        OrderResponse.class);
+
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException(
+                        "Unable to read stored idempotent response",
+                        e);
+            }
+        }
+
+        try {
+
+            UserResponse user =
+                    userServiceClient.getUserById(request.getUserId());
+
+            Order order = new Order();
+
+            order.setUserId(user.getId());
+            order.setProductId(request.getProductId());
+            order.setProductName(request.getProductName());
+            order.setQuantity(request.getQuantity());
+            order.setAmount(request.getAmount());
+            order.setStatus(OrderStatus.CREATED.name());
+
+            LocalDateTime now = LocalDateTime.now();
+
+            order.setCreatedAt(now);
+            order.setUpdatedAt(now);
+
+            Order savedOrder =
+                    orderRepository.save(order);
+
+            OrderItem orderItem = new OrderItem();
+
+            orderItem.setOrder(savedOrder);
+            orderItem.setProductId(savedOrder.getProductId());
+            orderItem.setProductName(savedOrder.getProductName());
+            orderItem.setQuantity(savedOrder.getQuantity());
+            orderItem.setAmount(savedOrder.getAmount());
+
+            orderItemRepository.save(orderItem);
+
+            OrderCreatedEvent event =
+                    new OrderCreatedEvent(
+                            savedOrder.getId(),
+                            savedOrder.getUserId(),
+                            savedOrder.getProductId(),
+                            savedOrder.getProductName(),
+                            savedOrder.getQuantity(),
+                            BigDecimal.valueOf(
+                                    savedOrder.getAmount()),
+                            "ORDER_CREATED",
+                            savedOrder.getCreatedAt()
+                    );
+
+            orderEventPublisher.publishOrderCreated(event);
+
+            OrderResponse response =
+                    mapToResponse(savedOrder);
+
+            String responseJson =
+                    objectMapper.writeValueAsString(response);
+
+            redisTemplate.opsForValue().set(
+                    redisKey,
+                    responseJson,
+                    IDEMPOTENCY_TTL);
+
+            return response;
+
+        } catch (Exception e) {
+
+            redisTemplate.delete(redisKey);
+
+            throw new RuntimeException(
+                    "Order creation failed",
+                    e);
+        }
     }
 
     public OrderResponse getOrderById(Long id) {
 
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
+                .orElseThrow(
+                        () -> new OrderNotFoundException(id));
 
         return mapToResponse(order);
     }
@@ -120,12 +219,14 @@ public class OrderService {
             UpdateOrderRequest request) {
 
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
+                .orElseThrow(
+                        () -> new OrderNotFoundException(id));
 
         order.setStatus(request.getStatus());
         order.setUpdatedAt(LocalDateTime.now());
 
-        Order updatedOrder = orderRepository.save(order);
+        Order updatedOrder =
+                orderRepository.save(order);
 
         return mapToResponse(updatedOrder);
     }
@@ -133,7 +234,8 @@ public class OrderService {
     public void cancelOrder(Long id) {
 
         Order order = orderRepository.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException(id));
+                .orElseThrow(
+                        () -> new OrderNotFoundException(id));
 
         order.setStatus(OrderStatus.CANCELLED.name());
         order.setUpdatedAt(LocalDateTime.now());

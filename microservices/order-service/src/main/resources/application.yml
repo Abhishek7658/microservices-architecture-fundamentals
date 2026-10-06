@@ -4,6 +4,10 @@ spring:
 
   profiles:
     active: dev
+  data:
+    redis:
+      host: localhost
+      port: 6379
 
   jpa:
     hibernate:
@@ -16,3 +20,5 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+server:
+  port: 8082
