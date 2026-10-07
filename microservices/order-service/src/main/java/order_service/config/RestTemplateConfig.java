@@ -1,24 +1,3 @@
-/*package order_service.config;
-
-import java.time.Duration;
-
-import org.springframework.boot.restclient.RestTemplateBuilder;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.web.client.RestTemplate;
-
-@Configuration
-public class RestTemplateConfig {
-
-    @Bean
-    public RestTemplate restTemplate(RestTemplateBuilder builder) {
-
-        return builder
-                .connectTimeout(Duration.ofSeconds(2))
-                .readTimeout(Duration.ofSeconds(2))
-                .build();
-    }
-}*/
 package order_service.config;
 
 import java.time.Duration;
@@ -32,18 +11,25 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class RestTemplateConfig {
 
-    @Value("${resilience.user-service.connect-timeout-ms}")
-    private long connectTimeoutMs;
+    @Value("${user-service.connect-timeout-ms:2000}")
+    private int connectTimeoutMs;
 
-    @Value("${resilience.user-service.read-timeout-ms}")
-    private long readTimeoutMs;
+    @Value("${user-service.read-timeout-ms:5000}")
+    private int readTimeoutMs;
 
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
 
         return builder
-                .connectTimeout(Duration.ofMillis(connectTimeoutMs))
-                .readTimeout(Duration.ofMillis(readTimeoutMs))
+                .connectTimeout(
+                        Duration.ofMillis(connectTimeoutMs)
+                )
+                .readTimeout(
+                        Duration.ofMillis(readTimeoutMs)
+                )
+                .additionalInterceptors(
+                        new CorrelationIdInterceptor()
+                )
                 .build();
     }
 }

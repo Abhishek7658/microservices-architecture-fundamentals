@@ -1,5 +1,9 @@
 package com.blackroth.inventory_service.event;
 
+import java.nio.charset.StandardCharsets;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.apache.kafka.common.header.Header;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -9,10 +13,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 @Component
 public class InventoryKafkaListener {
 
+    private static final String CORRELATION_ID_HEADER =
+            "X-Correlation-ID";
+
     private final InventoryService inventoryService;
     private final InventoryEventPublisher inventoryEventPublisher;
 
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper =
+            new ObjectMapper();
 
     public InventoryKafkaListener(
             InventoryService inventoryService,
@@ -26,9 +34,21 @@ public class InventoryKafkaListener {
             topics = "order-created",
             groupId = "inventory-service-group"
     )
-    public void handleOrderCreated(String message) {
+    public void handleOrderCreated(
+            ConsumerRecord<String, String> record) {
 
         try {
+
+            String message = record.value();
+
+            String correlationId =
+                    extractCorrelationId(record);
+
+            System.out.println(
+                    "Received OrderCreated event | Correlation ID: "
+                            + correlationId
+                            + " | Order ID from message"
+            );
 
             OrderCreatedEvent event =
                     objectMapper.readValue(
@@ -52,8 +72,17 @@ public class InventoryKafkaListener {
                                 event.getAmount()
                         );
 
-                inventoryEventPublisher.publishInventoryReserved(
-                        reservedEvent
+                inventoryEventPublisher
+                        .publishInventoryReserved(
+                                reservedEvent,
+                                correlationId
+                        );
+
+                System.out.println(
+                        "Inventory reserved | Correlation ID: "
+                                + correlationId
+                                + " | Order ID: "
+                                + event.getOrderId()
                 );
 
             } else {
@@ -68,11 +97,14 @@ public class InventoryKafkaListener {
 
                 inventoryEventPublisher
                         .publishInventoryReservationFailed(
-                                failedEvent
+                                failedEvent,
+                                correlationId
                         );
 
                 System.out.println(
-                        "Inventory unavailable for order: "
+                        "Inventory unavailable | Correlation ID: "
+                                + correlationId
+                                + " | Order ID: "
                                 + event.getOrderId()
                 );
             }
@@ -84,5 +116,23 @@ public class InventoryKafkaListener {
                             + e.getMessage()
             );
         }
+    }
+
+    private String extractCorrelationId(
+            ConsumerRecord<String, String> record) {
+
+        Header header =
+                record.headers().lastHeader(
+                        CORRELATION_ID_HEADER
+                );
+
+        if (header == null) {
+            return null;
+        }
+
+        return new String(
+                header.value(),
+                StandardCharsets.UTF_8
+        );
     }
 }

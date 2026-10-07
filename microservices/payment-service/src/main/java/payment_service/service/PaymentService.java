@@ -30,17 +30,23 @@ public class PaymentService {
 
     // Saga payment processing
     @Transactional
-    public void processPayment(InventoryReservedEvent event) {
+    public void processPayment(
+            InventoryReservedEvent event,
+            String correlationId) {
 
         // Prevent duplicate payment processing
-        if (paymentRepository.findByOrderId(event.getOrderId()).isPresent()) {
+        if (paymentRepository
+                .findByOrderId(event.getOrderId())
+                .isPresent()) {
+
             return;
         }
 
         BigDecimal amount = event.getAmount();
 
         // Payment failure condition
-        if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+        if (amount == null
+                || amount.compareTo(BigDecimal.ZERO) <= 0) {
 
             PaymentFailedEvent failedEvent =
                     new PaymentFailedEvent(
@@ -50,7 +56,10 @@ public class PaymentService {
                             "Payment failed: invalid payment amount"
                     );
 
-            paymentEventPublisher.publishPaymentFailed(failedEvent);
+            paymentEventPublisher.publishPaymentFailed(
+                    failedEvent,
+                    correlationId
+            );
 
             return;
         }
@@ -65,17 +74,23 @@ public class PaymentService {
                 "TXN-" + UUID.randomUUID()
         );
 
-        Payment savedPayment = paymentRepository.save(payment);
+        Payment savedPayment =
+                paymentRepository.save(payment);
 
         // Publish PaymentCompleted event
         PaymentCompletedEvent completedEvent =
                 new PaymentCompletedEvent(
                         savedPayment.getOrderId(),
-                        BigDecimal.valueOf(savedPayment.getAmount()),
+                        BigDecimal.valueOf(
+                                savedPayment.getAmount()
+                        ),
                         savedPayment.getTransactionReference()
                 );
 
-        paymentEventPublisher.publishPaymentCompleted(completedEvent);
+        paymentEventPublisher.publishPaymentCompleted(
+                completedEvent,
+                correlationId
+        );
     }
 
     // Create payment
@@ -91,18 +106,38 @@ public class PaymentService {
     // Get payment by ID
     public Payment getPaymentById(Long id) {
         return paymentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+                .orElseThrow(
+                        () -> new RuntimeException(
+                                "Payment not found"
+                        )
+                );
     }
 
     // Update payment
-    public Payment updatePayment(Long id, Payment updatedPayment) {
+    public Payment updatePayment(
+            Long id,
+            Payment updatedPayment) {
 
-        Payment existingPayment = paymentRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Payment not found"));
+        Payment existingPayment =
+                paymentRepository.findById(id)
+                        .orElseThrow(
+                                () -> new RuntimeException(
+                                        "Payment not found"
+                                )
+                        );
 
-        existingPayment.setOrderId(updatedPayment.getOrderId());
-        existingPayment.setAmount(updatedPayment.getAmount());
-        existingPayment.setStatus(updatedPayment.getStatus());
+        existingPayment.setOrderId(
+                updatedPayment.getOrderId()
+        );
+
+        existingPayment.setAmount(
+                updatedPayment.getAmount()
+        );
+
+        existingPayment.setStatus(
+                updatedPayment.getStatus()
+        );
+
         existingPayment.setTransactionReference(
                 updatedPayment.getTransactionReference()
         );
@@ -112,7 +147,10 @@ public class PaymentService {
 
     // Delete payment
     public void deletePayment(Long id) {
-        Payment payment = getPaymentById(id);
+
+        Payment payment =
+                getPaymentById(id);
+
         paymentRepository.delete(payment);
     }
 }
