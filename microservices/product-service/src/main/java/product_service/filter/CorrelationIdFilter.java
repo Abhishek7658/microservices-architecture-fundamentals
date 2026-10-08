@@ -1,6 +1,7 @@
-package product_service;
+package product_service.filter;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,16 +29,40 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        long startTime = System.nanoTime();
+
         String correlationId =
                 request.getHeader(CORRELATION_ID_HEADER);
 
-        logger.info(
-                "Correlation ID: {} | Method: {} | URI: {}",
-                correlationId,
-                request.getMethod(),
-                request.getRequestURI()
+        if (correlationId == null || correlationId.isBlank()) {
+            correlationId = UUID.randomUUID().toString();
+        }
+
+        request.setAttribute(
+                CORRELATION_ID_HEADER,
+                correlationId
         );
 
-        filterChain.doFilter(request, response);
+        try {
+
+            filterChain.doFilter(
+                    request,
+                    response
+            );
+
+        } finally {
+
+            long durationMs =
+                    (System.nanoTime() - startTime) / 1_000_000;
+
+            logger.info(
+                    "Correlation ID: {} | Method: {} | URI: {} | Status: {} | Duration: {} ms",
+                    correlationId,
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    response.getStatus(),
+                    durationMs
+            );
+        }
     }
 }

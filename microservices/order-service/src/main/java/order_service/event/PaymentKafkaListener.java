@@ -36,10 +36,10 @@ public class PaymentKafkaListener {
     public void handlePaymentCompleted(
             ConsumerRecord<String, String> record) {
 
-        try {
+        String correlationId =
+                extractCorrelationId(record);
 
-            String correlationId =
-                    extractCorrelationId(record);
+        try {
 
             PaymentCompletedEvent event =
                     objectMapper.readValue(
@@ -52,6 +52,10 @@ public class PaymentKafkaListener {
                             + correlationId
                             + " | Order ID: "
                             + event.getOrderId()
+                            + " | Product ID: "
+                            + event.getProductId()
+                            + " | Quantity: "
+                            + event.getQuantity()
             );
 
             Order order =
@@ -64,12 +68,27 @@ public class PaymentKafkaListener {
                                     )
                             );
 
-            // Idempotency: do not process an already confirmed order
+            /*
+             * Idempotency:
+             * If the same PaymentCompleted event is delivered again,
+             * do not confirm the order a second time.
+             */
             if ("CONFIRMED".equals(order.getStatus())) {
+
+                System.out.println(
+                        "PaymentCompleted already processed | "
+                                + "Order already CONFIRMED | "
+                                + "Correlation ID: "
+                                + correlationId
+                                + " | Order ID: "
+                                + event.getOrderId()
+                );
+
                 return;
             }
 
             order.setStatus("CONFIRMED");
+
             orderRepository.save(order);
 
             System.out.println(
@@ -81,9 +100,22 @@ public class PaymentKafkaListener {
 
         } catch (Exception e) {
 
-            System.out.println(
-                    "Failed to process PaymentCompleted event: "
+            System.err.println(
+                    "Failed to process PaymentCompleted event | "
+                            + "Correlation ID: "
+                            + correlationId
+                            + " | Error: "
                             + e.getMessage()
+            );
+
+            /*
+             * Do not silently swallow Kafka processing failures.
+             * Propagating the exception allows Spring Kafka's
+             * error-handling mechanism to detect the failure.
+             */
+            throw new IllegalStateException(
+                    "Failed to process PaymentCompleted event",
+                    e
             );
         }
     }

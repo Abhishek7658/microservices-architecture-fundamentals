@@ -22,6 +22,8 @@ public class Inventory {
 
     private Integer reservedQuantity;
 
+    private Integer soldQuantity;
+
     public Inventory() {
     }
 
@@ -49,7 +51,9 @@ public class Inventory {
         return availableQuantity;
     }
 
-    public void setAvailableQuantity(Integer availableQuantity) {
+    public void setAvailableQuantity(
+            Integer availableQuantity) {
+
         this.availableQuantity = availableQuantity;
     }
 
@@ -57,7 +61,19 @@ public class Inventory {
         return reservedQuantity;
     }
 
-    public void setReservedQuantity(Integer reservedQuantity) {
+    public void setReservedQuantity(
+            Integer reservedQuantity) {
+
         this.reservedQuantity = reservedQuantity;
+    }
+
+    public Integer getSoldQuantity() {
+        return soldQuantity;
+    }
+
+    public void setSoldQuantity(
+            Integer soldQuantity) {
+
+        this.soldQuantity = soldQuantity;
     }
 }

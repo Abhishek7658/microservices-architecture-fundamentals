@@ -29,6 +29,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        long startTime = System.nanoTime();
+
         String correlationId =
                 request.getHeader(CORRELATION_ID_HEADER);
 
@@ -46,16 +48,26 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
                 correlationId
         );
 
-        logger.info(
-                "Correlation ID: {} | Method: {} | URI: {}",
-                correlationId,
-                request.getMethod(),
-                request.getRequestURI()
-        );
+        try {
 
-        filterChain.doFilter(
-                request,
-                response
-        );
+            filterChain.doFilter(
+                    request,
+                    response
+            );
+
+        } finally {
+
+            long durationMs =
+                    (System.nanoTime() - startTime) / 1_000_000;
+
+            logger.info(
+                    "Correlation ID: {} | Method: {} | URI: {} | Status: {} | Duration: {} ms",
+                    correlationId,
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    response.getStatus(),
+                    durationMs
+            );
+        }
     }
 }

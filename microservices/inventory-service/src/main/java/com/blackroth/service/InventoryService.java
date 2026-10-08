@@ -1,4 +1,5 @@
 package com.blackroth.inventory_service.service;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -9,16 +10,28 @@ import com.blackroth.inventory_service.repository.InventoryRepository;
 public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
-    public InventoryService(InventoryRepository inventoryRepository) {
-        this.inventoryRepository = inventoryRepository;
+
+    public InventoryService(
+            InventoryRepository inventoryRepository) {
+
+        this.inventoryRepository =
+                inventoryRepository;
     }
 
     @Transactional
-    public boolean reserveInventory(Long productId, Integer quantity) {
+    public boolean reserveInventory(
+            Long productId,
+            Integer quantity) {
 
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() ->
-                        new RuntimeException("Inventory not found for product: " + productId));
+        Inventory inventory =
+                inventoryRepository
+                        .findByProductId(productId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Inventory not found for product: "
+                                                + productId
+                                )
+                        );
 
         if (inventory.getAvailableQuantity() < quantity) {
             return false;
@@ -32,17 +45,74 @@ public class InventoryService {
                 inventory.getReservedQuantity() + quantity
         );
 
+        if (inventory.getSoldQuantity() == null) {
+            inventory.setSoldQuantity(0);
+        }
+
         inventoryRepository.save(inventory);
 
         return true;
     }
 
     @Transactional
-    public void releaseInventory(Long productId, Integer quantity) {
+    public void completeSale(
+            Long productId,
+            Integer quantity) {
 
-        Inventory inventory = inventoryRepository.findByProductId(productId)
-                .orElseThrow(() ->
-                        new RuntimeException("Inventory not found for product: " + productId));
+        Inventory inventory =
+                inventoryRepository
+                        .findByProductId(productId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Inventory not found for product: "
+                                                + productId
+                                )
+                        );
+
+        Integer reservedQuantity =
+                inventory.getReservedQuantity();
+
+        if (reservedQuantity == null
+                || reservedQuantity < quantity) {
+
+            throw new IllegalStateException(
+                    "Insufficient reserved inventory for product: "
+                            + productId
+            );
+        }
+
+        Integer soldQuantity =
+                inventory.getSoldQuantity();
+
+        if (soldQuantity == null) {
+            soldQuantity = 0;
+        }
+
+        inventory.setReservedQuantity(
+                reservedQuantity - quantity
+        );
+
+        inventory.setSoldQuantity(
+                soldQuantity + quantity
+        );
+
+        inventoryRepository.save(inventory);
+    }
+
+    @Transactional
+    public void releaseInventory(
+            Long productId,
+            Integer quantity) {
+
+        Inventory inventory =
+                inventoryRepository
+                        .findByProductId(productId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Inventory not found for product: "
+                                                + productId
+                                )
+                        );
 
         inventory.setReservedQuantity(
                 inventory.getReservedQuantity() - quantity
@@ -51,6 +121,10 @@ public class InventoryService {
         inventory.setAvailableQuantity(
                 inventory.getAvailableQuantity() + quantity
         );
+
+        if (inventory.getSoldQuantity() == null) {
+            inventory.setSoldQuantity(0);
+        }
 
         inventoryRepository.save(inventory);
     }

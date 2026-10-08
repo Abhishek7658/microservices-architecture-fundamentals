@@ -61,3 +61,6 @@ Thumbs.db
 # ================================
 *.tmp
 *.temp*.zip
+
+# OpenTelemetry Java Agent
+observability/opentelemetry-javaagent.jar

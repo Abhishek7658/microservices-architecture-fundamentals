@@ -81,6 +81,8 @@ public class PaymentService {
         PaymentCompletedEvent completedEvent =
                 new PaymentCompletedEvent(
                         savedPayment.getOrderId(),
+                        event.getProductId(),
+                        event.getQuantity(),
                         BigDecimal.valueOf(
                                 savedPayment.getAmount()
                         ),
