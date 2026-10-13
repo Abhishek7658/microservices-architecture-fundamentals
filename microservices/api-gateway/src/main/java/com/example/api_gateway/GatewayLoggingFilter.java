@@ -83,6 +83,7 @@ public class GatewayLoggingFilter extends OncePerRequestFilter {
             /*
              * Continue the request processing.
              */
+            logger.info("Authorization header present: {}", wrappedRequest.getHeader("Authorization") != null);
             filterChain.doFilter(
                     wrappedRequest,
                     response

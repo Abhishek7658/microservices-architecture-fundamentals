@@ -3,6 +3,7 @@ package payment_service.service;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import payment_service.exception.PaymentNotFoundException;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -105,15 +106,10 @@ public class PaymentService {
         return paymentRepository.findAll();
     }
 
-    // Get payment by ID
-    public Payment getPaymentById(Long id) {
-        return paymentRepository.findById(id)
-                .orElseThrow(
-                        () -> new RuntimeException(
-                                "Payment not found"
-                        )
-                );
-    }
+public Payment getPaymentById(Long id) {
+    return paymentRepository.findById(id)
+            .orElseThrow(() -> new PaymentNotFoundException(id));
+}
 
     // Update payment
     public Payment updatePayment(
@@ -123,9 +119,7 @@ public class PaymentService {
         Payment existingPayment =
                 paymentRepository.findById(id)
                         .orElseThrow(
-                                () -> new RuntimeException(
-                                        "Payment not found"
-                                )
+                                () -> new PaymentNotFoundException(id)
                         );
 
         existingPayment.setOrderId(

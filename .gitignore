@@ -1,3 +1,6 @@
+# Ignore ZIP archives throughout this repository
+*.zip
+
 # ================================
 # Java compiled class files
 # ================================
