@@ -11,10 +11,10 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class RestTemplateConfig {
 
-    @Value("${user-service.connect-timeout-ms:2000}")
+    @Value("${resilience.user-service.connect-timeout-ms:2000}")
     private int connectTimeoutMs;
 
-    @Value("${user-service.read-timeout-ms:5000}")
+    @Value("${resilience.user-service.read-timeout-ms:5000}")
     private int readTimeoutMs;
 
     @Bean
