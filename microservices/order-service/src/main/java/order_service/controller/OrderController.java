@@ -1,7 +1,7 @@
 package order_service.controller;
 
 import java.util.List;
-
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,14 +30,19 @@ public class OrderController {
         this.orderService = orderService;
     }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public OrderResponse createOrder(
-            @RequestHeader("Idempotency-Key") String idempotencyKey,
-            @Valid @RequestBody CreateOrderRequest request) {
+@PostMapping
+@ResponseStatus(HttpStatus.CREATED)
+public OrderResponse createOrder(
+        @RequestHeader("Idempotency-Key") String idempotencyKey,
+        @Valid @RequestBody CreateOrderRequest request,
+        HttpServletRequest httpRequest) {
 
-        return orderService.createOrder(idempotencyKey, request);
-    }
+    String correlationId =
+            httpRequest.getHeader("X-Correlation-ID");
+
+    return orderService.createOrder(
+            idempotencyKey, request, correlationId);
+}
 
     @GetMapping
     public List<OrderResponse> getAllOrders() {

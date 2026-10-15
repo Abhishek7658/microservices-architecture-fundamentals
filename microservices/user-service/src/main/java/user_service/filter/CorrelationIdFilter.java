@@ -1,3 +1,4 @@
+
 package user_service.filter;
 
 import java.io.IOException;
@@ -5,6 +6,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -38,31 +40,30 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             correlationId = UUID.randomUUID().toString();
         }
 
-        request.setAttribute(
-                CORRELATION_ID_HEADER,
-                correlationId
-        );
+        request.setAttribute(CORRELATION_ID_HEADER, correlationId);
+
+        // Keep the response header consistent with the incoming ID.
+        response.setHeader(CORRELATION_ID_HEADER, correlationId);
+
+        // Make the ID available to all SLF4J logs in this request.
+        MDC.put("correlationId", correlationId);
 
         try {
-
-            filterChain.doFilter(
-                    request,
-                    response
-            );
-
+            filterChain.doFilter(request, response);
         } finally {
-
             long durationMs =
                     (System.nanoTime() - startTime) / 1_000_000;
 
             logger.info(
-                    "Correlation ID: {} | Method: {} | URI: {} | Status: {} | Duration: {} ms",
+                    "HTTP request completed | correlationId={} | method={} | uri={} | status={} | durationMs={}",
                     correlationId,
                     request.getMethod(),
                     request.getRequestURI(),
                     response.getStatus(),
                     durationMs
             );
+
+            MDC.remove("correlationId");
         }
     }
 }

@@ -1,31 +1,37 @@
+
 package payment_service.event;
 
 import java.nio.charset.StandardCharsets;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 
 import payment_service.service.PaymentService;
 
 @Component
 public class PaymentKafkaListener {
 
+    private static final Logger log =
+            LoggerFactory.getLogger(PaymentKafkaListener.class);
+
     private static final String CORRELATION_ID_HEADER =
             "X-Correlation-ID";
 
     private final PaymentService paymentService;
-
-    private final ObjectMapper objectMapper =
-            new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     public PaymentKafkaListener(
-            PaymentService paymentService) {
-
+            PaymentService paymentService,
+            ObjectMapper objectMapper) {
         this.paymentService = paymentService;
+        this.objectMapper = objectMapper;
     }
 
     @KafkaListener(
@@ -35,33 +41,37 @@ public class PaymentKafkaListener {
     public void handleInventoryReserved(
             ConsumerRecord<String, String> record) {
 
+        String correlationId = extractCorrelationId(record);
+
+        if (correlationId != null && !correlationId.isBlank()) {
+            MDC.put("correlationId", correlationId);
+        } else {
+            MDC.remove("correlationId");
+        }
+
         try {
-
-            String correlationId =
-                    extractCorrelationId(record);
-
-            System.out.println(
-                    "Received InventoryReserved event | Correlation ID: "
-                            + correlationId
+            InventoryReservedEvent event = objectMapper.readValue(
+                    record.value(),
+                    InventoryReservedEvent.class
             );
 
-            InventoryReservedEvent event =
-                    objectMapper.readValue(
-                            record.value(),
-                            InventoryReservedEvent.class
-                    );
-
-            paymentService.processPayment(
-                    event,
-                    correlationId
+            log.info(
+                    "Received InventoryReserved event | correlationId={} | orderId={}",
+                    correlationId,
+                    event.getOrderId()
             );
+
+            paymentService.processPayment(event, correlationId);
 
         } catch (Exception e) {
-
-            System.out.println(
-                    "Failed to process InventoryReserved event: "
-                            + e.getMessage()
+            log.error(
+                    "Failed to process InventoryReserved event | correlationId={}",
+                    correlationId,
+                    e
             );
+            // Preserve existing behavior: log without rethrowing.
+        } finally {
+            MDC.remove("correlationId");
         }
     }
 
@@ -69,11 +79,9 @@ public class PaymentKafkaListener {
             ConsumerRecord<String, String> record) {
 
         Header header =
-                record.headers().lastHeader(
-                        CORRELATION_ID_HEADER
-                );
+                record.headers().lastHeader(CORRELATION_ID_HEADER);
 
-        if (header == null) {
+        if (header == null || header.value() == null) {
             return null;
         }
 

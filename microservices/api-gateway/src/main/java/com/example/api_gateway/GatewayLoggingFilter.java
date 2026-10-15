@@ -1,3 +1,4 @@
+
 package com.example.api_gateway;
 
 import java.io.IOException;
@@ -7,6 +8,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -34,91 +36,80 @@ public class GatewayLoggingFilter extends OncePerRequestFilter {
 
         long startTime = System.currentTimeMillis();
 
-        /*
-         * Step 1:
-         * Check whether the client already provided
-         * a correlation ID.
-         */
         String correlationId =
                 request.getHeader(CORRELATION_ID_HEADER);
 
-        /*
-         * Step 2:
-         * If the client did not provide one,
-         * generate a new UUID.
-         */
         if (correlationId == null || correlationId.isBlank()) {
             correlationId = UUID.randomUUID().toString();
         }
 
-        /*
-         * Step 3:
-         * Add the correlation ID to the response.
-         * This allows the client/Postman to see
-         * which ID belongs to the request.
-         */
-        response.setHeader(
-                CORRELATION_ID_HEADER,
-                correlationId
-        );
-
-        /*
-         * Step 4:
-         * Wrap the incoming request so that
-         * downstream code can retrieve the
-         * correlation ID using getHeader().
-         */
-        HttpServletRequest wrappedRequest =
-                new CorrelationIdRequestWrapper(
-                        request,
-                        correlationId
-                );
-
-        String method = request.getMethod();
-        String url = request.getRequestURI();
-        String service = identifyService(url);
+        // Make the correlation ID available in Gateway logs.
+        MDC.put("correlationId", correlationId);
 
         try {
-
-            /*
-             * Continue the request processing.
-             */
-            logger.info("Authorization header present: {}", wrappedRequest.getHeader("Authorization") != null);
-            filterChain.doFilter(
-                    wrappedRequest,
-                    response
+            // Set one response value rather than appending a value.
+            response.setHeader(
+                    CORRELATION_ID_HEADER,
+                    correlationId
             );
 
-        } finally {
+            HttpServletRequest wrappedRequest =
+                    new CorrelationIdRequestWrapper(
+                            request,
+                            correlationId
+                    );
 
-            /*
-             * Step 5:
-             * Calculate total request processing time.
-             */
-            long responseTime =
-                    System.currentTimeMillis() - startTime;
+            String method = request.getMethod();
+            String url = request.getRequestURI();
+            String service = identifyService(url);
 
-            /*
-             * Step 6:
-             * Write structured request information
-             * to the Gateway logs.
-             */
             logger.info(
-                    "Correlation ID: {} | Method: {} | URL: {} | Service: {} | Status: {} | Response Time: {} ms",
+                    "Authorization header present: {}",
+                    wrappedRequest.getHeader("Authorization") != null
+            );
+
+            logger.info(
+                    "Idempotency-Key received by Gateway: {}",
+                    wrappedRequest.getHeader("Idempotency-Key")
+            );
+
+            filterChain.doFilter(wrappedRequest, response);
+            
+//filterChain.doFilter(wrappedRequest, response);
+
+// Replace any downstream correlation ID response value.
+response.setHeader(
+        CORRELATION_ID_HEADER,
+        correlationId
+);
+
+
+            logger.info(
+                    "Request completed | correlationId={} | method={} | "
+                            + "url={} | service={} | status={} | responseTimeMs={}",
                     correlationId,
                     method,
                     url,
                     service,
                     response.getStatus(),
-                    responseTime
+                    System.currentTimeMillis() - startTime
             );
+
+        } catch (ServletException | IOException | RuntimeException e) {
+            logger.error(
+                    "Request failed | correlationId={} | method={} | url={}",
+                    correlationId,
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    e
+            );
+            throw e;
+
+        } finally {
+            MDC.remove("correlationId");
         }
     }
 
-    /*
-     * Identifies which microservice is responsible
-     * for the requested Gateway route.
-     */
     private String identifyService(String url) {
 
         if (url.startsWith("/api/users")) {
@@ -140,77 +131,43 @@ public class GatewayLoggingFilter extends OncePerRequestFilter {
         return "unknown";
     }
 
-    /*
-     * Request wrapper used to make the generated
-     * or supplied correlation ID available through
-     * the request headers.
-     */
     private static class CorrelationIdRequestWrapper
             extends HttpServletRequestWrapper {
 
         private final String correlationId;
 
-        public CorrelationIdRequestWrapper(
+        private CorrelationIdRequestWrapper(
                 HttpServletRequest request,
                 String correlationId) {
-
             super(request);
             this.correlationId = correlationId;
         }
 
-        /*
-         * Returns our correlation ID when a service
-         * asks for X-Correlation-ID.
-         */
         @Override
         public String getHeader(String name) {
-
             if (CORRELATION_ID_HEADER.equalsIgnoreCase(name)) {
                 return correlationId;
             }
-
             return super.getHeader(name);
         }
 
-        /*
-         * Returns the correlation ID through getHeaders().
-         */
         @Override
         public Enumeration<String> getHeaders(String name) {
-
             if (CORRELATION_ID_HEADER.equalsIgnoreCase(name)) {
-
                 return Collections.enumeration(
-                        Collections.singletonList(
-                                correlationId
-                        )
+                        Collections.singletonList(correlationId)
                 );
             }
-
             return super.getHeaders(name);
         }
 
-        /*
-         * Makes X-Correlation-ID appear in the list
-         * of available request headers.
-         */
         @Override
         public Enumeration<String> getHeaderNames() {
+            var headers = Collections.list(super.getHeaderNames());
 
-            var headers =
-                    Collections.list(
-                            super.getHeaderNames()
-                    );
-
-            if (headers.stream()
-                    .noneMatch(
-                            h -> CORRELATION_ID_HEADER
-                                    .equalsIgnoreCase(h)
-                    )) {
-
-                headers.add(
-                        CORRELATION_ID_HEADER
-                );
+            if (headers.stream().noneMatch(
+                    h -> CORRELATION_ID_HEADER.equalsIgnoreCase(h))) {
+                headers.add(CORRELATION_ID_HEADER);
             }
 
             return Collections.enumeration(headers);

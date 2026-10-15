@@ -52,6 +52,7 @@ public class OutboxEventProcessor {
                 var message = MessageBuilder.withPayload(payload)
                         .setHeader(KafkaHeaders.TOPIC, ORDER_CREATED_TOPIC)
                         .setHeader(KafkaHeaders.KEY, event.getAggregateId())
+                        .setHeader("X-Correlation-ID", event.getCorrelationId())
                         .build();
 
                 kafkaTemplate.send(message).get(10, TimeUnit.SECONDS);

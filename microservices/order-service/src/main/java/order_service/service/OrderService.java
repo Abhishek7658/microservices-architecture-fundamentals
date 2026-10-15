@@ -69,7 +69,8 @@ public class OrderService {
     @Transactional
     public OrderResponse createOrder(
             String idempotencyKey,
-            CreateOrderRequest request) {
+            CreateOrderRequest request,
+            String correlationId) {
 
         if (idempotencyKey == null || idempotencyKey.isBlank()) {
             throw new IllegalArgumentException(
@@ -147,14 +148,16 @@ public class OrderService {
                     "ORDER_CREATED",
                     savedOrder.getCreatedAt());
 
-            String eventPayload = objectMapper.writeValueAsString(event);
+String eventPayload = objectMapper.writeValueAsString(event);
 
-            OutboxEvent outboxEvent = new OutboxEvent(
-                    "ORDER_CREATED",
-                    savedOrder.getId().toString(),
-                    eventPayload);
+OutboxEvent outboxEvent = new OutboxEvent(
+        "ORDER_CREATED",
+        savedOrder.getId().toString(),
+        eventPayload,
+        correlationId
+);
 
-            outboxEventRepository.save(outboxEvent);
+outboxEventRepository.save(outboxEvent);
 
             OrderResponse response = mapToResponse(savedOrder);
             String responseJson = objectMapper.writeValueAsString(response);

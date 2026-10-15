@@ -43,6 +43,8 @@ public class OutboxEvent {
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "correlation_id", length = 100)
+private String correlationId;
 
     private LocalDateTime publishedAt;
 
@@ -52,10 +54,12 @@ public class OutboxEvent {
     public OutboxEvent(
             String eventType,
             String aggregateId,
-            String payload) {
+            String payload,
+            String correlationId) {
         this.eventType = eventType;
         this.aggregateId = aggregateId;
         this.payload = payload;
+        this.correlationId = correlationId;
         this.status = "PENDING";
         this.createdAt = LocalDateTime.now();
     }
@@ -71,6 +75,9 @@ public class OutboxEvent {
     public String getAggregateId() {
         return aggregateId;
     }
+    public String getCorrelationId() {
+    return correlationId;
+}
 
     public String getPayload() {
         return payload;

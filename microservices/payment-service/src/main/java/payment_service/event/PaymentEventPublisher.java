@@ -1,13 +1,19 @@
+
 package payment_service.event;
 
 import java.nio.charset.StandardCharsets;
 
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
 public class PaymentEventPublisher {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(PaymentEventPublisher.class);
 
     private static final String PAYMENT_COMPLETED_TOPIC =
             "payment-completed";
@@ -22,7 +28,6 @@ public class PaymentEventPublisher {
 
     public PaymentEventPublisher(
             KafkaTemplate<String, Object> kafkaTemplate) {
-
         this.kafkaTemplate = kafkaTemplate;
     }
 
@@ -40,11 +45,10 @@ public class PaymentEventPublisher {
 
         kafkaTemplate.send(record);
 
-        System.out.println(
-                "Published PaymentCompleted event | Correlation ID: "
-                        + correlationId
-                        + " | Order ID: "
-                        + event.getOrderId()
+        log.info(
+                "Published PaymentCompleted event | correlationId={} | orderId={}",
+                correlationId,
+                event.getOrderId()
         );
     }
 
@@ -62,11 +66,10 @@ public class PaymentEventPublisher {
 
         kafkaTemplate.send(record);
 
-        System.out.println(
-                "Published PaymentFailed event | Correlation ID: "
-                        + correlationId
-                        + " | Order ID: "
-                        + event.getOrderId()
+        log.info(
+                "Published PaymentFailed event | correlationId={} | orderId={}",
+                correlationId,
+                event.getOrderId()
         );
     }
 
@@ -77,20 +80,18 @@ public class PaymentEventPublisher {
             String correlationId) {
 
         ProducerRecord<String, Object> record =
-                new ProducerRecord<>(
-                        topic,
-                        key,
-                        event
-                );
+                new ProducerRecord<>(topic, key, event);
 
-        if (correlationId != null
-                && !correlationId.isBlank()) {
-
+        if (correlationId != null && !correlationId.isBlank()) {
             record.headers().add(
                     CORRELATION_ID_HEADER,
-                    correlationId.getBytes(
-                            StandardCharsets.UTF_8
-                    )
+                    correlationId.getBytes(StandardCharsets.UTF_8)
+            );
+        } else {
+            log.warn(
+                    "Publishing Kafka event without correlation ID | topic={} | key={}",
+                    topic,
+                    key
             );
         }
 
