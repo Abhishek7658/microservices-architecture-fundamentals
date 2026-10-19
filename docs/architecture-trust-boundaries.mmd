@@ -1,0 +1,105 @@
+
+flowchart TB
+    client["External Client"]
+
+    subgraph TB1["TB1 — External Request Boundary"]
+        gateway["API Gateway<br/>Port 8080<br/>Routing, Rate Limiting, Correlation ID"]
+    end
+
+    subgraph TB2["TB2 — Internal HTTP Services"]
+        user["User Service<br/>Port 8090"]
+        order["Order Service<br/>Port 8082<br/>Idempotency + Outbox"]
+        product["Product Service<br/>Port 8081<br/>API v1 / v2"]
+        payment["Payment Service<br/>Port 8084"]
+    end
+
+    subgraph TB4["TB4 — Asynchronous Messaging"]
+        kafka[("Apache Kafka")]
+        orderCreated["order-created"]
+        inventoryReserved["inventory-reserved"]
+        inventoryFailed["inventory-reservation-failed"]
+        paymentCompleted["payment-completed"]
+        paymentFailed["payment-failed"]
+        inventoryReleased["inventory-released"]
+    end
+
+    subgraph EVENT_SERVICES["Event-Driven Services"]
+        inventory["Inventory Service"]
+        notification["Notification Service"]
+    end
+
+    subgraph TB5["TB5 — Service-Owned Persistence"]
+        orderDB[("Order Database")]
+        userDB[("User Database")]
+        productDB[("Product Database")]
+        paymentDB[("Payment Database")]
+        inventoryDB[("Inventory Database")]
+    end
+
+    subgraph TB6["TB6 — Redis State"]
+        redis[("Redis")]
+    end
+
+    client -->|"HTTP"| gateway
+
+    gateway -->|"/api/users/**"| user
+    gateway -->|"/api/orders/** → /api/v1/orders/**"| order
+    gateway -->|"/api/products/** → v1"| product
+    gateway -->|"/api/v2/products/** → v2"| product
+    gateway -->|"/api/payments/** → /payments"| payment
+
+    order -->|"Verify user"| user
+
+    order --> orderDB
+    user --> userDB
+    product --> productDB
+    payment --> paymentDB
+    inventory --> inventoryDB
+
+    gateway -->|"Rate-limit counters"| redis
+    order -->|"Idempotency state"| redis
+
+    orderDB -->|"Outbox publication path to verify"| orderCreated
+    orderCreated --> kafka
+    kafka --> orderCreated
+    orderCreated --> inventory
+    orderCreated --> notification
+
+    inventory --> inventoryReserved
+    inventory --> inventoryFailed
+    inventory --> inventoryReleased
+
+    inventoryReserved --> kafka
+    inventoryFailed --> kafka
+    inventoryReleased --> kafka
+
+    kafka --> inventoryReserved
+    kafka --> inventoryFailed
+    kafka --> inventoryReleased
+
+    inventoryReserved --> payment
+
+    payment --> paymentCompleted
+    payment --> paymentFailed
+    paymentCompleted --> kafka
+    paymentFailed --> kafka
+
+    kafka --> paymentCompleted
+    kafka --> paymentFailed
+
+    paymentCompleted --> order
+    paymentCompleted --> inventory
+    paymentFailed --> inventory
+    inventoryFailed --> order
+    inventoryReleased --> order
+
+    classDef external fill:#f3f4f6,stroke:#374151,color:#111827
+    classDef http fill:#dbeafe,stroke:#2563eb,color:#111827
+    classDef event fill:#fef3c7,stroke:#d97706,color:#111827
+    classDef storage fill:#dcfce7,stroke:#16a34a,color:#111827
+    classDef boundary fill:#f9fafb,stroke:#6b7280,color:#111827
+
+    class client external
+    class gateway,user,order,product,payment,inventory,notification http
+    class kafka,orderCreated,inventoryReserved,inventoryFailed,paymentCompleted,paymentFailed,inventoryReleased event
+    class orderDB,userDB,productDB,paymentDB,inventoryDB,redis storage

@@ -11,9 +11,8 @@ import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
-import tools.jackson.databind.ObjectMapper;
-
 import payment_service.service.PaymentService;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class PaymentKafkaListener {

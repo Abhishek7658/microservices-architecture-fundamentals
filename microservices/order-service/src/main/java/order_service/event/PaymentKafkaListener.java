@@ -1,9 +1,13 @@
 package order_service.event;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Header;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -14,6 +18,9 @@ import order_service.repository.OrderRepository;
 
 @Component
 public class PaymentKafkaListener {
+
+    private static final Logger log =
+            LoggerFactory.getLogger(PaymentKafkaListener.class);
 
     private static final String CORRELATION_ID_HEADER =
             "X-Correlation-ID";
@@ -39,6 +46,11 @@ public class PaymentKafkaListener {
         String correlationId =
                 extractCorrelationId(record);
 
+        // Make the ID appear in the [correlationId=...] part of every log line.
+        if (correlationId != null && !correlationId.isBlank()) {
+            MDC.put("correlationId", correlationId);
+        }
+
         try {
 
             PaymentCompletedEvent event =
@@ -47,15 +59,11 @@ public class PaymentKafkaListener {
                             PaymentCompletedEvent.class
                     );
 
-            System.out.println(
-                    "Received PaymentCompleted event | Correlation ID: "
-                            + correlationId
-                            + " | Order ID: "
-                            + event.getOrderId()
-                            + " | Product ID: "
-                            + event.getProductId()
-                            + " | Quantity: "
-                            + event.getQuantity()
+            log.info(
+                    "Received PaymentCompleted event | orderId={} | productId={} | quantity={}",
+                    event.getOrderId(),
+                    event.getProductId(),
+                    event.getQuantity()
             );
 
             Order order =
@@ -75,37 +83,30 @@ public class PaymentKafkaListener {
              */
             if ("CONFIRMED".equals(order.getStatus())) {
 
-                System.out.println(
-                        "PaymentCompleted already processed | "
-                                + "Order already CONFIRMED | "
-                                + "Correlation ID: "
-                                + correlationId
-                                + " | Order ID: "
-                                + event.getOrderId()
+                log.info(
+                        "PaymentCompleted already processed | Order already CONFIRMED | orderId={}",
+                        event.getOrderId()
                 );
 
                 return;
             }
 
             order.setStatus("CONFIRMED");
+            order.setUpdatedAt(LocalDateTime.now());
 
             orderRepository.save(order);
 
-            System.out.println(
-                    "Order confirmed after payment: "
-                            + event.getOrderId()
-                            + " | Correlation ID: "
-                            + correlationId
+            log.info(
+                    "Order confirmed after payment | orderId={}",
+                    event.getOrderId()
             );
 
         } catch (Exception e) {
 
-            System.err.println(
-                    "Failed to process PaymentCompleted event | "
-                            + "Correlation ID: "
-                            + correlationId
-                            + " | Error: "
-                            + e.getMessage()
+            log.error(
+                    "Failed to process PaymentCompleted event | correlationId={}",
+                    correlationId,
+                    e
             );
 
             /*
@@ -117,6 +118,10 @@ public class PaymentKafkaListener {
                     "Failed to process PaymentCompleted event",
                     e
             );
+
+        } finally {
+            // Listener threads are reused, so always clear the MDC.
+            MDC.remove("correlationId");
         }
     }
 
@@ -128,7 +133,7 @@ public class PaymentKafkaListener {
                         CORRELATION_ID_HEADER
                 );
 
-        if (header == null) {
+        if (header == null || header.value() == null) {
             return null;
         }
 

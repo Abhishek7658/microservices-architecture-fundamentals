@@ -1,4 +1,3 @@
-
 package com.example.api_gateway;
 
 import java.io.IOException;
@@ -17,6 +16,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletResponseWrapper;
 
 @Component
 public class GatewayLoggingFilter extends OncePerRequestFilter {
@@ -47,15 +47,19 @@ public class GatewayLoggingFilter extends OncePerRequestFilter {
         MDC.put("correlationId", correlationId);
 
         try {
-            // Set one response value rather than appending a value.
-            response.setHeader(
-                    CORRELATION_ID_HEADER,
-                    correlationId
-            );
-
             HttpServletRequest wrappedRequest =
                     new CorrelationIdRequestWrapper(
                             request,
+                            correlationId
+                    );
+
+            // FIX: the proxied (downstream) response headers are written with
+            // addHeader(), which APPENDS to the value set here. This wrapper
+            // turns any addHeader() for X-Correlation-ID into setHeader(), so
+            // the response always carries exactly one value.
+            HttpServletResponse wrappedResponse =
+                    new SingleCorrelationIdResponseWrapper(
+                            response,
                             correlationId
                     );
 
@@ -73,16 +77,10 @@ public class GatewayLoggingFilter extends OncePerRequestFilter {
                     wrappedRequest.getHeader("Idempotency-Key")
             );
 
-            filterChain.doFilter(wrappedRequest, response);
-            
-//filterChain.doFilter(wrappedRequest, response);
+            filterChain.doFilter(wrappedRequest, wrappedResponse);
 
-// Replace any downstream correlation ID response value.
-response.setHeader(
-        CORRELATION_ID_HEADER,
-        correlationId
-);
-
+            // NOTE: do NOT set the header again here. By this point the
+            // response is already committed, so a setHeader() call is ignored.
 
             logger.info(
                     "Request completed | correlationId={} | method={} | "
@@ -171,6 +169,43 @@ response.setHeader(
             }
 
             return Collections.enumeration(headers);
+        }
+    }
+
+    /**
+     * Guarantees a single X-Correlation-ID value on the response, no matter
+     * how many times the downstream proxy tries to add it.
+     */
+    private static class SingleCorrelationIdResponseWrapper
+            extends HttpServletResponseWrapper {
+
+        private final String correlationId;
+
+        private SingleCorrelationIdResponseWrapper(
+                HttpServletResponse response,
+                String correlationId) {
+            super(response);
+            this.correlationId = correlationId;
+            super.setHeader(CORRELATION_ID_HEADER, correlationId);
+        }
+
+        @Override
+        public void addHeader(String name, String value) {
+            if (CORRELATION_ID_HEADER.equalsIgnoreCase(name)) {
+                // Replace instead of append; always keep the gateway's value.
+                super.setHeader(CORRELATION_ID_HEADER, correlationId);
+                return;
+            }
+            super.addHeader(name, value);
+        }
+
+        @Override
+        public void setHeader(String name, String value) {
+            if (CORRELATION_ID_HEADER.equalsIgnoreCase(name)) {
+                super.setHeader(CORRELATION_ID_HEADER, correlationId);
+                return;
+            }
+            super.setHeader(name, value);
         }
     }
 }
