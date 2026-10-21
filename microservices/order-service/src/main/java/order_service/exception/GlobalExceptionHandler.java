@@ -101,7 +101,6 @@
 // }
 
 package order_service.exception;
-
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -229,6 +228,19 @@ public class GlobalExceptionHandler {
                         "Unable to communicate with User Service",
                         request));
     }
+    @ExceptionHandler(IdempotencyConflictException.class)
+public ResponseEntity<Map<String, Object>> handleIdempotencyConflict(
+        IdempotencyConflictException ex,
+        HttpServletRequest request) {
+
+    return ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(buildErrorResponse(
+                    HttpStatus.CONFLICT,
+                    "Conflict",
+                    ex.getMessage(),
+                    request));
+}
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleUnexpectedException(
